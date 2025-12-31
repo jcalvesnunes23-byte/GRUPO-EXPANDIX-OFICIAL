@@ -6,15 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Grupo Expandix | Enterprise AI</title>
   
-  <!-- Polyfill para evitar erro de 'process is not defined' em produção -->
-  <script>
-    window.process = { 
-      env: { 
-        API_KEY: "" // Será preenchido pelo ambiente ou ficará vazio sem quebrar o app
-      } 
-    };
-  </script>
-
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;900&display=swap" rel="stylesheet">
   <style>
@@ -63,9 +54,9 @@
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
     "@google/genai": "https://esm.sh/@google/genai@1.3.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.1",
     "recharts": "https://esm.sh/recharts@2.12.7",
@@ -85,7 +76,6 @@
 
   <script type="module">
     import("./index.tsx").then(() => {
-      // Remove o loader assim que o módulo carregar
       const loader = document.getElementById('root-loading');
       if (loader) loader.style.opacity = '0';
       setTimeout(() => loader?.remove(), 500);
@@ -94,9 +84,9 @@
       document.body.innerHTML = `
         <div style="background: black; color: #D4AF37; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-family: sans-serif; padding: 20px;">
           <h1 style="font-weight: 900; margin-bottom: 10px;">ERRO DE INFRAESTRUTURA</h1>
-          <p style="color: #666; font-size: 12px; max-width: 400px; line-height: 1.6;">O sistema não pôde ser inicializado em produção. Verifique se as variáveis de ambiente (API_KEY) estão configuradas na Vercel.</p>
+          <p style="color: #666; font-size: 12px; max-width: 400px; line-height: 1.6;">Erro no carregamento dos módulos. Verifique as configurações da Vercel.</p>
           <pre style="background: #111; padding: 15px; border-radius: 10px; font-size: 10px; color: #ef4444; margin-top: 20px; text-align: left; max-width: 90vw; overflow: auto;">${err.message}</pre>
-          <button onclick="location.reload()" style="margin-top: 30px; background: #D4AF37; color: black; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer;">TENTAR RECONEXÃO</button>
+          <button onclick="location.reload()" style="margin-top: 30px; background: #D4AF37; color: black; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer;">TENTAR NOVAMENTE</button>
         </div>
       `;
     });
