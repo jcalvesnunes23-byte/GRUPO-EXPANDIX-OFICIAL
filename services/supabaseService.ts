@@ -1,110 +1,93 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Board, Task, TaskGroup, User } from '../types';
+import { Board, Task, User, TaskStatus, TaskPriority, TaskGroup } from '../types';
 
-const supabaseUrl = 'https://hacalncfrljjetwoophm.supabase.co';
-const supabaseKey = 'sb_publishable_lLvhbIPq2w7F3pykz-t06w_7DUhQsDO';
+/**
+ * SCHEMA SQL PARA O SUPABASE (Execute no SQL Editor do seu painel):
+ * 
+ * -- 1. Tabela de Hubs (Boards)
+ * create table public.boards (
+ *   id text primary key,
+ *   name text not null,
+ *   description text,
+ *   members text[] default '{}',
+ *   created_at timestamp with time zone default timezone('utc'::text, now()) not null
+ * );
+ * 
+ * -- 2. Tabela de Fases (Groups)
+ * create table public.task_groups (
+ *   id text primary key,
+ *   board_id text references public.boards(id) on delete cascade,
+ *   name text not null,
+ *   color text,
+ *   created_at timestamp with time zone default timezone('utc'::text, now()) not null
+ * );
+ * 
+ * -- 3. Tabela de Operações (Tasks)
+ * create table public.tasks (
+ *   id text primary key,
+ *   group_id text references public.task_groups(id) on delete cascade,
+ *   title text not null,
+ *   description text,
+ *   client_name text,
+ *   client_avatar text,
+ *   client_phone text,
+ *   value numeric default 0,
+ *   status text,
+ *   priority text,
+ *   owner_id text,
+ *   created_at timestamp with time zone default timezone('utc'::text, now()) not null
+ * );
+ */
+
+const supabaseUrl = 'https://uzpbkzebwoafjviicynw.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6cGJremVid29hZmp2aWljeW53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjAwMTIsImV4cCI6MjA4MzEzNjAxMn0.9z0i7yy89R0BL9OLa7p2GhM0svqHzv5SjdErqT38gws';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-const USER_STORAGE_KEY = 'expandix_user_profile';
+const STORAGE_KEY = 'expandix_persistence_v1';
+const USER_STORAGE_KEY = 'expandix_user_profile_v1';
 
 export const supabaseService = {
-  // Gestão de Usuários com Fallback para LocalStorage
-  async fetchUser(id: string): Promise<User | null> {
-    // 1. Tenta carregar do LocalStorage primeiro para velocidade e offline
-    const localData = localStorage.getItem(USER_STORAGE_KEY);
-    let user: User | null = localData ? JSON.parse(localData) : null;
-
+  async fetchBoards(): Promise<Board[]> {
     try {
-      // 2. Tenta buscar no Supabase para sincronizar
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const { data: boards, error } = await supabase
+        .from('boards')
+        .select(`
+          *,
+          groups:task_groups (
+            *,
+            tasks:tasks (*)
+          )
+        `)
+        .order('created_at', { ascending: true });
       
-      if (!error && data) {
-        user = data as User;
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+      if (error) throw error;
+
+      if (boards && boards.length > 0) {
+        const formatted = boards.map(b => ({
+          ...b,
+          groups: (b.groups || []).map((g: any) => ({
+            ...g,
+            tasks: (g.tasks || []).sort((a: any, b: any) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+          })).sort((a: any, b: any) => 
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          )
+        }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(formatted));
+        return formatted;
       }
     } catch (e) {
-      console.warn('Supabase inacessível para usuários, usando cache local.');
+      console.warn("Offline ou erro de conexão. Usando cache local.");
     }
     
-    return user;
+    const localData = localStorage.getItem(STORAGE_KEY);
+    return localData ? JSON.parse(localData) : [];
   },
 
-  async upsertUser(user: User) {
-    // 1. Salva IMEDIATAMENTE no LocalStorage (Garante que "ficou salvo")
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-
-    // 2. Tenta sincronizar com o Supabase
-    try {
-      const { error } = await supabase
-        .from('users')
-        .upsert({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          avatar: user.avatar,
-          role: user.role
-        });
-      
-      if (error) {
-        // Se o erro for de tabela inexistente, apenas logamos e não quebramos o app
-        if (error.code === 'PGRST116' || error.message.includes('cache')) {
-          console.error('DICA: Crie a tabela "users" no Supabase com colunas id, name, email, avatar, role.');
-        } else {
-          throw error;
-        }
-      }
-    } catch (err: any) {
-      console.error('Falha na sincronização cloud:', err.message);
-      // Não lançamos erro aqui para que o usuário sinta que "salvou" (salvou no local)
-    }
-    return true;
-  },
-
-  async fetchBoards(): Promise<Board[]> {
-    const { data: boards, error: bError } = await supabase
-      .from('boards')
-      .select(`
-        *,
-        groups:task_groups (
-          *,
-          tasks:tasks (*)
-        )
-      `);
-    
-    if (bError) {
-      console.error('Erro detalhado Supabase:', bError.message || JSON.stringify(bError));
-      throw bError; 
-    }
-    
-    if (!boards) return [];
-
-    return (boards as any[]).map(board => ({
-      ...board,
-      groups: (board.groups || []).map((group: any) => ({
-        ...group,
-        tasks: (group.tasks || []).map((task: any) => ({
-          ...task,
-          groupId: task.group_id,
-          clientAvatar: task.client_avatar,
-          clientIdea: task.client_idea,
-          clientRequest: task.client_request,
-          clientPhone: task.client_phone,
-          ownerId: task.owner_id,
-          startDate: task.start_date,
-          endDate: task.end_date,
-          comments: task.comments || []
-        }))
-      }))
-    })) as Board[];
-  },
-
-  async upsertBoard(board: Board) {
+  async saveBoard(board: Board) {
     const { error } = await supabase
       .from('boards')
       .upsert({
@@ -113,28 +96,38 @@ export const supabaseService = {
         description: board.description,
         members: board.members
       });
-    if (error) throw error;
-    return true;
+    if (error) console.error("Erro ao salvar hub:", error);
   },
 
-  async deleteBoard(id: string) {
+  async deleteBoard(boardId: string) {
     const { error } = await supabase
       .from('boards')
       .delete()
-      .eq('id', id);
-    if (error) throw error;
-    return true;
+      .eq('id', boardId);
+    if (error) console.error("Erro ao deletar hub:", error);
   },
 
-  async upsertGroup(group: any) {
+  async saveGroup(groupId: string, boardId: string, groupData: Partial<TaskGroup>) {
     const { error } = await supabase
       .from('task_groups')
-      .upsert(group);
-    if (error) throw error;
-    return true;
+      .upsert({
+        id: groupId,
+        board_id: boardId,
+        name: groupData.name,
+        color: groupData.color
+      });
+    if (error) console.error("Erro ao salvar fase:", error);
   },
 
-  async upsertTask(task: Task) {
+  async deleteGroup(groupId: string) {
+    const { error } = await supabase
+      .from('task_groups')
+      .delete()
+      .eq('id', groupId);
+    if (error) console.error("Erro ao deletar fase:", error);
+  },
+
+  async saveTask(task: Task) {
     const { error } = await supabase
       .from('tasks')
       .upsert({
@@ -142,27 +135,41 @@ export const supabaseService = {
         group_id: task.groupId,
         title: task.title,
         description: task.description,
+        client_name: task.clientName,
         client_avatar: task.clientAvatar,
-        client_idea: task.clientIdea,
-        client_request: task.clientRequest,
         client_phone: task.clientPhone,
         value: task.value,
         status: task.status,
         priority: task.priority,
-        owner_id: task.ownerId,
-        start_date: task.startDate,
-        end_date: task.endDate
+        owner_id: task.ownerId
       });
-    if (error) throw error;
-    return true;
+    if (error) console.error("Erro ao salvar tarefa:", error);
   },
 
-  async deleteTask(id: string) {
+  async deleteTask(taskId: string) {
     const { error } = await supabase
       .from('tasks')
       .delete()
-      .eq('id', id);
-    if (error) throw error;
-    return true;
+      .eq('id', taskId);
+    if (error) console.error("Erro ao deletar tarefa:", error);
+  },
+
+  async fetchUserProfile(): Promise<User> {
+    const localUser = localStorage.getItem(USER_STORAGE_KEY);
+    return localUser ? JSON.parse(localUser) : {
+      id: '1',
+      name: 'Diretor Expandix',
+      email: 'admin@expandix.com',
+      avatar: '',
+      role: 'ADMIN'
+    };
+  },
+
+  async updateUserProfile(user: User): Promise<void> {
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  },
+
+  saveBoardsLocally(boards: Board[]) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(boards));
   }
 };

@@ -4,51 +4,203 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Grupo Expandix | Enterprise AI</title>
+  <title>Grupo Expandix | Enterprise AI Core</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
+      --gold-bright: #FFF7AD;
       --gold-primary: #D4AF37;
-      --gold-secondary: #F59E0B;
-      --bg-main: #000000;
+      --gold-muted: #8A6E2F;
+      --bg-void: #000000;
+      --bg-deep: #050505;
+      --bg-surface: #0a0a0a;
+      --whatsapp-green: #25D366;
       --text-main: #ffffff;
+      --text-dim: #666666;
     }
+    
+    * {
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
     body { 
-      font-family: 'Inter', sans-serif; 
-      background-color: var(--bg-main);
+      font-family: 'Plus Jakarta Sans', sans-serif; 
+      background-color: var(--bg-void);
       color: var(--text-main);
       margin: 0;
+      overflow: hidden;
     }
+
+    /* Luxury Gold Gradient Typography */
     .gold-text-gradient {
-      background: linear-gradient(135deg, #FFF7AD 0%, #D4AF37 50%, #8A6E2F 100%);
+      background: linear-gradient(135deg, var(--gold-bright) 0%, var(--gold-primary) 50%, var(--gold-muted) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 2px rgba(212, 175, 55, 0.4));
     }
-    .gold-gradient {
-      background: linear-gradient(135deg, #FFF7AD 0%, #D4AF37 50%, #8A6E2F 100%);
+
+    /* AI Assistant Subtle Glow */
+    @keyframes gemini-glow {
+      0% {
+        box-shadow: 0 0 5px rgba(212, 175, 55, 0.2), 0 0 10px rgba(0, 0, 0, 0.5);
+        border-color: rgba(212, 175, 55, 0.3);
+      }
+      50% {
+        box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), 0 0 30px rgba(212, 175, 55, 0.1);
+        border-color: rgba(212, 175, 55, 0.6);
+      }
+      100% {
+        box-shadow: 0 0 5px rgba(212, 175, 55, 0.2), 0 0 10px rgba(0, 0, 0, 0.5);
+        border-color: rgba(212, 175, 55, 0.3);
+      }
     }
-    #root-loading {
-      position: fixed;
-      inset: 0;
-      background: black;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      transition: opacity 0.5s ease;
+
+    .gemini-glow-btn {
+      background: linear-gradient(145deg, #0a0a0a 0%, #000000 100%);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      animation: gemini-glow 4s ease-in-out infinite;
+      transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
     }
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid rgba(212, 175, 55, 0.1);
-      border-top-color: #D4AF37;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
+
+    .gemini-glow-btn:hover {
+      transform: scale(1.1) rotate(5deg);
+      border-color: var(--gold-bright);
+      background: linear-gradient(145deg, #111 0%, #050505 100%);
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Status Indicators with Depth */
+    .status-glow-stopped {
+      background: rgba(244, 63, 94, 0.03);
+      border: 1px solid rgba(244, 63, 94, 0.2);
+      color: #fb7185;
+      box-shadow: 0 0 15px rgba(244, 63, 94, 0.05);
+    }
+    .status-glow-working {
+      background: rgba(212, 175, 55, 0.03);
+      border: 1px solid rgba(212, 175, 55, 0.3);
+      color: var(--gold-primary);
+      box-shadow: 0 0 20px rgba(212, 175, 55, 0.1);
+      animation: neural-pulse 4s infinite ease-in-out;
+    }
+    .status-glow-done {
+      background: rgba(16, 185, 129, 0.03);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.05);
+    }
+
+    @keyframes neural-pulse {
+      0%, 100% { opacity: 1; filter: brightness(1); }
+      50% { opacity: 0.8; filter: brightness(1.2); }
+    }
+
+    /* Enhanced Interactive Elements */
+    .whatsapp-btn-vibrant {
+      background: rgba(37, 211, 102, 0.05);
+      border: 1px solid rgba(37, 211, 102, 0.15);
+      color: var(--whatsapp-green);
+      transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+    }
+    .whatsapp-btn-vibrant:hover {
+      background: var(--whatsapp-green);
+      color: black;
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 0 10px 25px rgba(37, 211, 102, 0.2);
+    }
+
+    /* High-End Glassmorphism */
+    .glass-card {
+      background: linear-gradient(145deg, rgba(15, 15, 15, 0.8) 0%, rgba(5, 5, 5, 0.9) 100%);
+      backdrop-filter: blur(25px);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+    }
+    .glass-card:hover {
+      border-color: rgba(212, 175, 55, 0.2);
+      background: linear-gradient(145deg, rgba(20, 20, 20, 0.9) 0%, rgba(10, 10, 10, 0.95) 100%);
+      transform: translateY(-4px);
+    }
+
+    /* Scrollbar Articulation */
+    .scrollbar-hide::-webkit-scrollbar { width: 4px; height: 4px; }
+    .scrollbar-hide::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-hide::-webkit-scrollbar-thumb { 
+      background: rgba(212, 175, 55, 0.1); 
+      border-radius: 10px; 
+      transition: background 0.3s;
+    }
+    .scrollbar-hide::-webkit-scrollbar-thumb:hover { background: rgba(212, 175, 55, 0.3); }
+
+    /* Neural Background Flow */
+    @keyframes modal-bg-flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .modal-dynamic-bg {
+      background: linear-gradient(270deg, #000000, #080703, #151106, #080703, #000000);
+      background-size: 300% 300%;
+      animation: modal-bg-flow 15s ease-in-out infinite;
+    }
+
+    /* Specialized Animations */
+    @keyframes slideInFromBottom {
+      from { transform: translateY(20px); opacity: 0; filter: blur(5px); }
+      to { transform: translateY(0); opacity: 1; filter: blur(0); }
+    }
+
+    .animate-neural-entry {
+      animation: slideInFromBottom 0.8s cubic-bezier(0.19, 1, 0.22, 1) both;
+    }
+
+    /* Luxury Typography Utils */
+    .tracking-neural { letter-spacing: 0.25em; }
+    .tracking-tighter-neural { letter-spacing: -0.05em; }
+    
+    /* Layout Helpers */
+    .sidebar-active-glow {
+      box-shadow: inset 0 0 30px rgba(212, 175, 55, 0.05), 0 0 15px rgba(212, 175, 55, 0.05);
+    }
+
+    /* --- LOADING SCREEN ANIMATIONS --- */
+    @keyframes loader-entry {
+      from { opacity: 0; transform: scale(0.95); filter: blur(10px); }
+      to { opacity: 1; transform: scale(1); filter: blur(0); }
+    }
+
+    @keyframes loader-exit {
+      from { opacity: 1; transform: scale(1); filter: blur(0); }
+      to { opacity: 0; transform: scale(1.05); filter: blur(20px); }
+    }
+
+    @keyframes logo-shimmer {
+      0% { text-shadow: 0 0 5px rgba(212, 175, 55, 0.2); }
+      50% { text-shadow: 0 0 30px rgba(212, 175, 55, 0.6); }
+      100% { text-shadow: 0 0 5px rgba(212, 175, 55, 0.2); }
+    }
+
+    @keyframes line-draw {
+      0% { width: 0; opacity: 0; }
+      100% { width: 100%; opacity: 1; }
+    }
+
+    .loader-content {
+      animation: loader-entry 1.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+    }
+
+    .loader-logo {
+      animation: logo-shimmer 3s ease-in-out infinite;
+    }
+
+    .loader-bar {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+      animation: line-draw 2s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+    }
   </style>
 
 <script type="importmap">
@@ -57,39 +209,49 @@
     "react": "https://esm.sh/react@18.3.1",
     "react-dom": "https://esm.sh/react-dom@18.3.1",
     "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react/": "https://esm.sh/react@18.3.1/",
+    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
     "@google/genai": "https://esm.sh/@google/genai@1.3.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.1",
-    "recharts": "https://esm.sh/recharts@2.12.7",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
+    "recharts": "https://esm.sh/recharts@2.12.7?external=react,react-dom"
   }
 }
 </script>
 </head>
-<body class="h-screen overflow-hidden">
-  <div id="root-loading">
-    <div class="spinner mb-4"></div>
-    <div class="text-[10px] font-black tracking-[0.5em] text-amber-500/50 uppercase">Expandix Neural System</div>
+<body>
+  <!-- LOADING OVERLAY -->
+  <div id="root-loading" class="fixed inset-0 flex items-center justify-center bg-black z-[9999] transition-all duration-1000 ease-in-out">
+    <div class="loader-content flex flex-col items-center max-w-md w-full px-8">
+      <!-- ORNAMENT -->
+      <div class="relative w-32 h-32 mb-12 flex items-center justify-center">
+        <div class="absolute inset-0 border-[1px] border-amber-500/10 rounded-full animate-[ping_4s_infinite]"></div>
+        <div class="absolute inset-4 border-[1px] border-amber-500/20 rounded-full animate-[spin_6s_linear_infinite]"></div>
+        <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-600/30 via-black to-black border border-amber-500/40 shadow-[0_0_40px_rgba(212,175,55,0.2)]"></div>
+      </div>
+
+      <!-- BRAND -->
+      <h1 class="loader-logo text-5xl font-black uppercase tracking-[0.2em] gold-text-gradient mb-6 text-center leading-none">
+        Grupo Expandix
+      </h1>
+      
+      <!-- DECORATIVE LINE -->
+      <div class="w-full loader-bar mb-10"></div>
+
+      <!-- STATUS -->
+      <div class="flex flex-col items-center gap-4">
+        <div class="text-[9px] font-black tracking-[0.8em] text-amber-500/50 uppercase animate-pulse text-center">
+          Iniciando Core OS Neural
+        </div>
+        <div class="flex gap-2">
+          <div class="w-1 h-1 bg-amber-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+          <div class="w-1 h-1 bg-amber-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+          <div class="w-1 h-1 bg-amber-500 rounded-full animate-bounce" style="animation-delay: 0.3s"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div id="root" class="h-full"></div>
-
-  <script type="module">
-    import("./index.tsx").then(() => {
-      const loader = document.getElementById('root-loading');
-      if (loader) loader.style.opacity = '0';
-      setTimeout(() => loader?.remove(), 500);
-    }).catch(err => {
-      console.error("Falha no boot Expandix:", err);
-      document.body.innerHTML = `
-        <div style="background: black; color: #D4AF37; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-family: sans-serif; padding: 20px;">
-          <h1 style="font-weight: 900; margin-bottom: 10px;">ERRO DE INFRAESTRUTURA</h1>
-          <p style="color: #666; font-size: 12px; max-width: 400px; line-height: 1.6;">Erro no carregamento dos módulos. Verifique as configurações da Vercel.</p>
-          <pre style="background: #111; padding: 15px; border-radius: 10px; font-size: 10px; color: #ef4444; margin-top: 20px; text-align: left; max-width: 90vw; overflow: auto;">${err.message}</pre>
-          <button onclick="location.reload()" style="margin-top: 30px; background: #D4AF37; color: black; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer;">TENTAR NOVAMENTE</button>
-        </div>
-      `;
-    });
-  </script>
+  <div id="root" class="h-screen w-screen"></div>
+  <script type="module" src="index.tsx"></script>
 </body>
 </html>

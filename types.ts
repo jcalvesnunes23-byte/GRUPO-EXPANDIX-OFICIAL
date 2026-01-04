@@ -37,10 +37,9 @@ export interface Task {
   id: string;
   title: string;
   description: string;
+  clientName?: string;
   clientAvatar?: string;
-  clientIdea?: string;
-  clientRequest?: string;
-  clientPhone?: string; // Novo campo para WhatsApp
+  clientPhone?: string; 
   value?: number;
   status: TaskStatus;
   priority: TaskPriority;
@@ -73,12 +72,5 @@ export interface Board {
   description: string;
   groups: TaskGroup[];
   automations: Automation[];
-  members: string[]; // IDs de Usuários
-}
-
-export interface Organization {
-  id: string;
-  name: string;
-  boards: Board[];
-  members: User[];
+  members: string[];
 }
