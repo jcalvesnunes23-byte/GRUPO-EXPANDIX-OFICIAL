@@ -2,46 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { Board, Task, User, TaskStatus, TaskPriority, TaskGroup } from '../types';
 
-/**
- * SCHEMA SQL PARA O SUPABASE (Execute no SQL Editor do seu painel):
- * 
- * -- 1. Tabela de Hubs (Boards)
- * create table public.boards (
- *   id text primary key,
- *   name text not null,
- *   description text,
- *   members text[] default '{}',
- *   created_at timestamp with time zone default timezone('utc'::text, now()) not null
- * );
- * 
- * -- 2. Tabela de Fases (Groups)
- * create table public.task_groups (
- *   id text primary key,
- *   board_id text references public.boards(id) on delete cascade,
- *   name text not null,
- *   color text,
- *   created_at timestamp with time zone default timezone('utc'::text, now()) not null
- * );
- * 
- * -- 3. Tabela de Operações (Tasks)
- * create table public.tasks (
- *   id text primary key,
- *   group_id text references public.task_groups(id) on delete cascade,
- *   title text not null,
- *   description text,
- *   client_name text,
- *   client_avatar text,
- *   client_phone text,
- *   value numeric default 0,
- *   status text,
- *   priority text,
- *   owner_id text,
- *   created_at timestamp with time zone default timezone('utc'::text, now()) not null
- * );
- */
-
-const supabaseUrl = 'https://uzpbkzebwoafjviicynw.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6cGJremVid29hZmp2aWljeW53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjAwMTIsImV4cCI6MjA4MzEzNjAxMn0.9z0i7yy89R0BL9OLa7p2GhM0svqHzv5SjdErqT38gws';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://uzpbkzebwoafjviicynw.supabase.co';
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6cGJremVid29hZmp2aWljeW53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjAwMTIsImV4cCI6MjA4MzEzNjAxMn0.9z0i7yy89R0BL9OLa7p2GhM0svqHzv5SjdErqT38gws';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -49,6 +11,59 @@ const STORAGE_KEY = 'expandix_persistence_v1';
 const USER_STORAGE_KEY = 'expandix_user_profile_v1';
 
 export const supabaseService = {
+  // Script SQL Completo para Restauração Total do Sistema
+  RLS_FIX_SQL: `
+-- SCRIPT DE RESTAURAÇÃO TOTAL EXPANDIX NEURAL --
+-- Cole este código no SQL EDITOR do Supabase e clique em RUN --
+
+-- 1. TABELAS
+CREATE TABLE IF NOT EXISTS public.boards (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    members JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.task_groups (
+    id TEXT PRIMARY KEY,
+    board_id TEXT REFERENCES public.boards(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    color TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.tasks (
+    id TEXT PRIMARY KEY,
+    group_id TEXT REFERENCES public.task_groups(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    client_name TEXT,
+    client_avatar TEXT,
+    client_phone TEXT,
+    value NUMERIC DEFAULT 0,
+    status TEXT DEFAULT 'PARADO',
+    priority TEXT DEFAULT 'Média',
+    owner_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. SEGURANÇA (RLS)
+ALTER TABLE public.boards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.task_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+
+-- 3. POLÍTICAS
+DROP POLICY IF EXISTS "Public access to boards" ON public.boards;
+CREATE POLICY "Public access to boards" ON public.boards FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public access to task_groups" ON public.task_groups;
+CREATE POLICY "Public access to task_groups" ON public.task_groups FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public access to tasks" ON public.tasks;
+CREATE POLICY "Public access to tasks" ON public.tasks FOR ALL USING (true) WITH CHECK (true);
+  `,
+
   async fetchBoards(): Promise<Board[]> {
     try {
       const { data: boards, error } = await supabase
@@ -62,9 +77,14 @@ export const supabaseService = {
         `)
         .order('created_at', { ascending: true });
       
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
+            this.handleRLSError({ message: "As tabelas do banco de dados foram removidas. É necessário recriar a estrutura." }, "fetchBoards");
+        }
+        throw error;
+      }
 
-      if (boards && boards.length > 0) {
+      if (boards) {
         const formatted = boards.map(b => ({
           ...b,
           groups: (b.groups || []).map((g: any) => ({
@@ -79,8 +99,8 @@ export const supabaseService = {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(formatted));
         return formatted;
       }
-    } catch (e) {
-      console.warn("Offline ou erro de conexão. Usando cache local.");
+    } catch (e: any) {
+      console.warn("Utilizando cache local devido a falha no banco:", e.message);
     }
     
     const localData = localStorage.getItem(STORAGE_KEY);
@@ -96,15 +116,25 @@ export const supabaseService = {
         description: board.description,
         members: board.members
       });
-    if (error) console.error("Erro ao salvar hub:", error);
+    
+    if (error) this.handleRLSError(error, "saveBoard");
   },
 
   async deleteBoard(boardId: string) {
-    const { error } = await supabase
-      .from('boards')
-      .delete()
-      .eq('id', boardId);
-    if (error) console.error("Erro ao deletar hub:", error);
+    try {
+      const { error } = await supabase
+        .from('boards')
+        .delete()
+        .eq('id', boardId);
+      
+      if (error) {
+        this.handleRLSError(error, "deleteBoard");
+        return false;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
   },
 
   async saveGroup(groupId: string, boardId: string, groupData: Partial<TaskGroup>) {
@@ -116,7 +146,8 @@ export const supabaseService = {
         name: groupData.name,
         color: groupData.color
       });
-    if (error) console.error("Erro ao salvar fase:", error);
+    
+    if (error) this.handleRLSError(error, "saveGroup");
   },
 
   async deleteGroup(groupId: string) {
@@ -124,7 +155,7 @@ export const supabaseService = {
       .from('task_groups')
       .delete()
       .eq('id', groupId);
-    if (error) console.error("Erro ao deletar fase:", error);
+    if (error) this.handleRLSError(error, "deleteGroup");
   },
 
   async saveTask(task: Task) {
@@ -143,7 +174,7 @@ export const supabaseService = {
         priority: task.priority,
         owner_id: task.ownerId
       });
-    if (error) console.error("Erro ao salvar tarefa:", error);
+    if (error) this.handleRLSError(error, "saveTask");
   },
 
   async deleteTask(taskId: string) {
@@ -151,7 +182,15 @@ export const supabaseService = {
       .from('tasks')
       .delete()
       .eq('id', taskId);
-    if (error) console.error("Erro ao deletar tarefa:", error);
+    if (error) this.handleRLSError(error, "deleteTask");
+  },
+
+  handleRLSError(error: any, context: string) {
+    console.error(`Database Alert (${context}):`, error.message);
+    // Se for erro de política ou se a tabela não existir mais
+    if (error.message?.includes("row-level security") || error.message?.includes("does not exist") || error.message?.includes("recriar a estrutura")) {
+      window.dispatchEvent(new CustomEvent('supabase-rls-error', { detail: { message: error.message } }));
+    }
   },
 
   async fetchUserProfile(): Promise<User> {

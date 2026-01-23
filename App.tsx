@@ -32,6 +32,8 @@ export default function App() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isNewTask, setIsNewTask] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [rlsError, setRlsError] = useState<string | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [activeGroupMenuId, setActiveGroupMenuId] = useState<string | null>(null);
   const [activeBoardMenuId, setActiveBoardMenuId] = useState<string | null>(null);
@@ -44,28 +46,63 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profileFileInputRef = useRef<HTMLInputElement>(null);
 
+  const loadData = async () => {
+    const boardsData = await supabaseService.fetchBoards();
+    const userData = await supabaseService.fetchUserProfile();
+    setBoards(boardsData);
+    setCurrentUser(userData);
+    if (boardsData.length > 0) {
+      const lastActive = localStorage.getItem('last_active_board');
+      setActiveBoardId(lastActive && boardsData.find(b => b.id === lastActive) ? lastActive : boardsData[0].id);
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
-      const boardsData = await supabaseService.fetchBoards();
-      const userData = await supabaseService.fetchUserProfile();
-      setBoards(boardsData);
-      setCurrentUser(userData);
-      if (boardsData.length > 0) {
-        const lastActive = localStorage.getItem('last_active_board');
-        setActiveBoardId(lastActive && boardsData.find(b => b.id === lastActive) ? lastActive : boardsData[0].id);
-      }
+      await loadData();
       setIsLoading(false);
     };
     init();
 
+    const handleRLSError = (e: any) => {
+      setRlsError(e.detail.message);
+    };
+
+    window.addEventListener('supabase-rls-error', handleRLSError);
     const handleClickOutside = () => {
       setActiveMenuId(null);
       setActiveGroupMenuId(null);
       setActiveBoardMenuId(null);
     };
     window.addEventListener('click', handleClickOutside);
-    return () => window.removeEventListener('click', handleClickOutside);
+    
+    return () => {
+      window.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('supabase-rls-error', handleRLSError);
+    };
   }, []);
+
+  const handleRetryConnection = async () => {
+    setIsValidating(true);
+    // Pequeno delay para efeito visual de "escaneamento neural"
+    await new Promise(r => setTimeout(r, 1500));
+    
+    try {
+      // Tenta buscar os dados novamente. Se falhar, o handleRLSError será disparado de novo.
+      const boardsData = await supabaseService.fetchBoards();
+      if (boardsData && !boardsData.some(b => false)) { // Verificação simples
+        setRlsError(null);
+        setBoards(boardsData);
+        if (boardsData.length > 0 && !activeBoardId) {
+          setActiveBoardId(boardsData[0].id);
+        }
+      }
+    } catch (e) {
+      console.error("Re-tentativa falhou");
+    } finally {
+      setIsValidating(false);
+    }
+  };
 
   const activeBoard = useMemo(() => boards.find(b => b.id === activeBoardId), [boards, activeBoardId]);
   const allTasks = useMemo(() => activeBoard?.groups.flatMap(g => g.tasks) || [], [activeBoard]);
@@ -106,16 +143,15 @@ export default function App() {
       groups: [{ id: `g-${Date.now()}`, name: 'Operações Ativas', color: '#D4AF37', tasks: [] }]
     };
 
-    // Salva no Supabase
-    await supabaseService.saveBoard(newBoard);
-    for (const g of newBoard.groups) {
-      await supabaseService.saveGroup(g.id, newBoard.id, g);
-    }
-
     const updated = [...boards, newBoard];
     persist(updated);
     setActiveBoardId(newBoard.id);
     setIsCreatingBoard(false);
+
+    await supabaseService.saveBoard(newBoard);
+    for (const g of newBoard.groups) {
+      await supabaseService.saveGroup(g.id, newBoard.id, g);
+    }
   };
 
   const handleStartRename = (board: Board) => {
@@ -133,34 +169,33 @@ export default function App() {
     const board = boards.find(b => b.id === boardId);
     if (board) {
       const updatedBoard = { ...board, name: tempBoardName.trim() };
-      await supabaseService.saveBoard(updatedBoard);
       const updated = boards.map(b => b.id === boardId ? updatedBoard : b);
       persist(updated);
+      await supabaseService.saveBoard(updatedBoard);
     }
     setRenamingBoardId(null);
   };
 
   const handleDeleteBoard = async (boardId: string) => {
     if (!window.confirm("Deseja realmente excluir este Hub Estratégico?")) return;
-    await supabaseService.deleteBoard(boardId);
     const updated = boards.filter(b => b.id !== boardId);
     persist(updated);
     if (activeBoardId === boardId) {
       setActiveBoardId(updated[0]?.id || '');
     }
     setActiveBoardMenuId(null);
+    await supabaseService.deleteBoard(boardId);
   };
 
   const handleDeleteGroup = async (groupId: string) => {
     if (!window.confirm("Tem certeza que deseja excluir esta fase e todos os seus trabalhos? Esta ação não pode ser desfeita.")) return;
-    
-    await supabaseService.deleteGroup(groupId);
     const updated = boards.map(b => b.id === activeBoardId ? {
       ...b,
       groups: b.groups.filter(g => g.id !== groupId)
     } : b);
     persist(updated);
     setActiveGroupMenuId(null);
+    await supabaseService.deleteGroup(groupId);
   };
 
   const handleAddTask = (groupId?: string, status?: TaskStatus) => {
@@ -191,8 +226,6 @@ export default function App() {
       return;
     }
 
-    await supabaseService.saveTask(task);
-
     let updatedBoards: Board[];
     if (isNewTask) {
       updatedBoards = boards.map(b => b.id === activeBoardId ? {
@@ -212,6 +245,7 @@ export default function App() {
     persist(updatedBoards);
     setEditingTask(null);
     setIsNewTask(false);
+    await supabaseService.saveTask(task);
   };
 
   const handleDrop = async (e: React.DragEvent, newStatus: TaskStatus) => {
@@ -225,8 +259,6 @@ export default function App() {
     const task = allTasks.find(t => t.id === taskId);
     if (task) {
       const updatedTask = { ...task, status: newStatus };
-      await supabaseService.saveTask(updatedTask);
-      
       const updated = boards.map(b => b.id === activeBoardId ? {
         ...b,
         groups: b.groups.map(g => ({
@@ -235,6 +267,7 @@ export default function App() {
         }))
       } : b);
       persist(updated);
+      await supabaseService.saveTask(updatedTask);
     }
   };
 
@@ -273,157 +306,39 @@ export default function App() {
           <title>Ficha Técnica - ${task.clientName}</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap');
-            body { 
-              font-family: 'Plus Jakarta Sans', sans-serif; 
-              padding: 60px; 
-              color: #111; 
-              line-height: 1.6; 
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            .header { 
-              border-bottom: 3px solid #D4AF37; 
-              padding-bottom: 30px; 
-              margin-bottom: 40px; 
-              display: flex; 
-              justify-content: space-between; 
-              align-items: center; 
-            }
-            .brand { 
-              font-weight: 800; 
-              font-size: 32px; 
-              color: #D4AF37; 
-              text-transform: uppercase; 
-              letter-spacing: 3px; 
-            }
-            .main-content {
-              display: flex;
-              gap: 40px;
-              margin-bottom: 40px;
-            }
-            .avatar-container {
-              width: 180px;
-              height: 180px;
-              border-radius: 20px;
-              border: 2px solid #D4AF37;
-              overflow: hidden;
-              background: #f8f8f8;
-              flex-shrink: 0;
-            }
-            .avatar-img {
-              width: 100%;
-              height: 100%;
-              object-fit: cover;
-            }
-            .info-container {
-              flex-grow: 1;
-            }
+            body { font-family: 'Plus Jakarta Sans', sans-serif; padding: 60px; color: #111; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+            .header { border-bottom: 3px solid #D4AF37; padding-bottom: 30px; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center; }
+            .brand { font-weight: 800; font-size: 32px; color: #D4AF37; text-transform: uppercase; letter-spacing: 3px; }
+            .main-content { display: flex; gap: 40px; margin-bottom: 40px; }
+            .avatar-container { width: 180px; height: 180px; border-radius: 20px; border: 2px solid #D4AF37; overflow: hidden; background: #f8f8f8; flex-shrink: 0; }
+            .avatar-img { width: 100%; height: 100%; object-fit: cover; }
+            .info-container { flex-grow: 1; }
             .section { margin-bottom: 25px; }
-            .label { 
-              font-weight: 800; 
-              font-size: 10px; 
-              color: #888; 
-              text-transform: uppercase; 
-              letter-spacing: 2px; 
-              display: block; 
-              margin-bottom: 5px; 
-            }
+            .label { font-weight: 800; font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 2px; display: block; margin-bottom: 5px; }
             .value { font-weight: 700; font-size: 18px; color: #111; }
-            .status { 
-              display: inline-block; 
-              padding: 6px 18px; 
-              border-radius: 6px; 
-              background: #000; 
-              color: #D4AF37;
-              font-weight: 800; 
-              text-transform: uppercase; 
-              font-size: 11px; 
-            }
-            .signatures {
-              margin-top: 80px;
-              display: flex;
-              justify-content: space-between;
-              gap: 50px;
-            }
-            .sig-box {
-              flex: 1;
-              text-align: center;
-            }
-            .sig-line {
-              border-top: 1px solid #111;
-              margin-bottom: 10px;
-            }
-            .sig-label {
-              font-weight: 800;
-              font-size: 11px;
-              text-transform: uppercase;
-              letter-spacing: 1.5px;
-            }
-            @media print {
-              body { padding: 40px; }
-            }
+            .status { display: inline-block; padding: 6px 18px; border-radius: 6px; background: #000; color: #D4AF37; font-weight: 800; text-transform: uppercase; font-size: 11px; }
+            .signatures { margin-top: 80px; display: flex; justify-content: space-between; gap: 50px; }
+            .sig-box { flex: 1; text-align: center; }
+            .sig-line { border-top: 1px solid #111; margin-bottom: 10px; }
+            .sig-label { font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; }
+            @media print { body { padding: 40px; } }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div class="brand">GRUPO EXPANDIX</div>
-            <div style="font-size: 11px; font-weight: 800; color: #999; text-transform: uppercase; letter-spacing: 2px;">Documento Técnico Neural</div>
-          </div>
-
+          <div class="header"><div class="brand">GRUPO EXPANDIX</div><div style="font-size: 11px; font-weight: 800; color: #999; text-transform: uppercase; letter-spacing: 2px;">Documento Técnico Neural</div></div>
           <div class="main-content">
-            <div class="avatar-container">
-              ${task.clientAvatar ? `<img src="${task.clientAvatar}" class="avatar-img" />` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ccc;font-weight:800;">SEM BIOMETRIA</div>'}
-            </div>
-            
+            <div class="avatar-container">${task.clientAvatar ? `<img src="${task.clientAvatar}" class="avatar-img" />` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ccc;font-weight:800;">SEM BIOMETRIA</div>'}</div>
             <div class="info-container">
-              <div class="section">
-                <span class="label">Operação</span>
-                <span class="value">${task.title}</span>
-              </div>
-              <div class="section">
-                <span class="label">Titular / Cliente</span>
-                <span class="value">${task.clientName || 'N/A'}</span>
-              </div>
-              <div class="section">
-                <span class="label">Canal Neural (WhatsApp)</span>
-                <span class="value">${task.clientPhone || 'N/A'}</span>
-              </div>
+              <div class="section"><span class="label">Operação</span><span class="value">${task.title}</span></div>
+              <div class="section"><span class="label">Titular / Cliente</span><span class="value">${task.clientName || 'N/A'}</span></div>
+              <div class="section"><span class="label">Canal Neural (WhatsApp)</span><span class="value">${task.clientPhone || 'N/A'}</span></div>
             </div>
           </div>
-
-          <div class="section">
-            <span class="label">Status Operacional</span>
-            <div class="status">${task.status}</div>
-          </div>
-
-          <div class="section">
-            <span class="label">Capital Alocado / Budget</span>
-            <span class="value" style="color: #D4AF37; font-size: 24px;">R$ ${task.value?.toLocaleString() || '0,00'}</span>
-          </div>
-
-          <div class="signatures">
-            <div class="sig-box">
-              <div class="sig-line"></div>
-              <div class="sig-label">Assinatura do Cliente</div>
-            </div>
-            <div class="sig-box">
-              <div class="sig-line"></div>
-              <div class="sig-label">Assinatura Grupo Expandix</div>
-            </div>
-          </div>
-
-          <div style="margin-top: 60px; text-align: center; color: #aaa; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
-            Este documento é de caráter sigiloso e exclusivo do ecossistema Expandix Neural.
-          </div>
-
-          <script>
-            window.onload = () => { 
-              setTimeout(() => {
-                window.print(); 
-                window.onafterprint = () => window.close();
-              }, 500);
-            }
-          </script>
+          <div class="section"><span class="label">Status Operacional</span><div class="status">${task.status}</div></div>
+          <div class="section"><span class="label">Capital Alocado / Budget</span><span class="value" style="color: #D4AF37; font-size: 24px;">R$ ${task.value?.toLocaleString() || '0,00'}</span></div>
+          <div class="signatures"><div class="sig-box"><div class="sig-line"></div><div class="sig-label">Assinatura do Cliente</div></div><div class="sig-box"><div class="sig-line"></div><div class="sig-label">Assinatura Grupo Expandix</div></div></div>
+          <div style="margin-top: 60px; text-align: center; color: #aaa; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">Este documento é de caráter sigiloso e exclusivo do ecossistema Expandix Neural.</div>
+          <script>window.onload = () => { setTimeout(() => { window.print(); window.onafterprint = () => window.close(); }, 500); }</script>
         </body>
       </html>
     `);
@@ -755,7 +670,9 @@ export default function App() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-32 text-center animate-neural-entry">
              <GoldGradientText className="text-[180px] opacity-10 blur-md absolute select-none tracking-[0.5em]">EXPANDIX</GoldGradientText>
-             <h2 className="text-5xl font-black uppercase tracking-[0.5em] z-10 mb-12">Neural Core Workspace</h2>
+             <h2 className="text-7xl font-black uppercase tracking-[0.3em] z-10 mb-12">
+               <GoldGradientText className="drop-shadow-[0_0_35px_rgba(212,175,55,0.5)]">Grupo Expandix</GoldGradientText>
+             </h2>
              <button onClick={handleStartCreateBoard} className="bg-white text-black px-24 py-8 rounded-[50px] font-black uppercase tracking-[0.6em] hover:bg-amber-500 hover:text-white transition-all shadow-[0_30px_60px_rgba(212,175,55,0.2)] z-10 active:scale-95">
                Inicializar Novo Hub
              </button>
@@ -836,6 +753,62 @@ export default function App() {
                 Salvar Credenciais
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE ERRO RLS (DATABASE SYNC) */}
+      {rlsError && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-10 animate-neural-entry">
+          <div className="bg-[#0a0a0a] border border-rose-500/30 w-full max-w-2xl rounded-[60px] shadow-[0_0_100px_rgba(244,63,94,0.1)] overflow-hidden flex flex-col p-16">
+            <div className="flex flex-col items-center text-center mb-10">
+              <div className="w-20 h-20 bg-rose-500/10 border border-rose-500/30 rounded-full flex items-center justify-center mb-8">
+                {isValidating ? (
+                   <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                   <Icons.Zap className="text-rose-500 scale-150" />
+                )}
+              </div>
+              <h3 className="text-3xl font-black uppercase tracking-tighter-neural text-rose-500">Falha na Conexão Cloud Neural</h3>
+              <p className="text-[11px] text-slate-500 font-black uppercase tracking-[0.4em] mt-3">Sua instância do Supabase foi removida ou requer autorização (RLS).</p>
+            </div>
+            
+            <div className="bg-black/50 border border-white/5 p-8 rounded-[32px] mb-10 overflow-y-auto max-h-40 scrollbar-hide">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Instruções de Restauração Total:</p>
+              <ol className="text-[11px] text-slate-500 space-y-4 font-bold">
+                <li>1. Acesse seu painel no <strong className="text-white">Supabase.com</strong></li>
+                <li>2. Clique em <strong className="text-white">SQL Editor</strong> no menu lateral.</li>
+                <li>3. Cole o código SQL completo de restauração (copie abaixo).</li>
+                <li>4. Clique em <strong className="text-white">Run</strong> e retorne aqui.</li>
+              </ol>
+            </div>
+
+            <div className="space-y-4">
+              <button 
+                onClick={handleRetryConnection}
+                disabled={isValidating}
+                className="w-full py-8 bg-amber-500 text-white rounded-[40px] font-black uppercase tracking-[0.6em] hover:bg-amber-400 transition-all duration-700 shadow-2xl flex items-center justify-center gap-4 disabled:opacity-50"
+              >
+                {isValidating ? "Validando Core..." : "Validar e Sincronizar Agora"}
+              </button>
+
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(supabaseService.RLS_FIX_SQL);
+                  alert("Script de restauração copiado!");
+                }}
+                className="w-full py-6 bg-white/5 text-white border border-white/10 rounded-[40px] font-black uppercase tracking-[0.6em] hover:bg-white/10 transition-all duration-700"
+              >
+                Copiar Script SQL
+              </button>
+            </div>
+
+            <button 
+              onClick={() => setRlsError(null)}
+              className="w-full py-4 text-[9px] font-black uppercase tracking-[0.4em] text-slate-700 hover:text-slate-400 transition-all mt-4"
+            >
+              Continuar em Modo Local (Cache)
+            </button>
           </div>
         </div>
       )}
