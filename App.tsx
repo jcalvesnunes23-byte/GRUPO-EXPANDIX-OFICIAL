@@ -84,13 +84,11 @@ export default function App() {
 
   const handleRetryConnection = async () => {
     setIsValidating(true);
-    // Pequeno delay para efeito visual de "escaneamento neural"
     await new Promise(r => setTimeout(r, 1500));
     
     try {
-      // Tenta buscar os dados novamente. Se falhar, o handleRLSError será disparado de novo.
       const boardsData = await supabaseService.fetchBoards();
-      if (boardsData && !boardsData.some(b => false)) { // Verificação simples
+      if (boardsData) {
         setRlsError(null);
         setBoards(boardsData);
         if (boardsData.length > 0 && !activeBoardId) {
@@ -335,6 +333,7 @@ export default function App() {
             </div>
           </div>
           <div class="section"><span class="label">Status Operacional</span><div class="status">${task.status}</div></div>
+          <div class="section"><span class="label">Descrição</span><div style="font-size: 13px; margin-top: 5px;">${task.description || 'Nenhuma descrição fornecida.'}</div></div>
           <div class="section"><span class="label">Capital Alocado / Budget</span><span class="value" style="color: #D4AF37; font-size: 24px;">R$ ${task.value?.toLocaleString() || '0,00'}</span></div>
           <div class="signatures"><div class="sig-box"><div class="sig-line"></div><div class="sig-label">Assinatura do Cliente</div></div><div class="sig-box"><div class="sig-line"></div><div class="sig-label">Assinatura Grupo Expandix</div></div></div>
           <div style="margin-top: 60px; text-align: center; color: #aaa; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">Este documento é de caráter sigiloso e exclusivo do ecossistema Expandix Neural.</div>
@@ -829,7 +828,7 @@ export default function App() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-16 space-y-14 scrollbar-hide relative z-10">
+            <div className="flex-1 overflow-y-auto p-16 space-y-12 scrollbar-hide relative z-10">
               <div className="flex items-center gap-14">
                 <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                    <div className="w-44 h-44 rounded-[48px] bg-black border border-white/10 flex items-center justify-center overflow-hidden shadow-2xl">
@@ -885,6 +884,17 @@ export default function App() {
                       {Object.values(TaskStatus).map(s => <option key={s} value={s} className="bg-black py-4">{s}</option>)}
                     </select>
                  </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-[0.4em] ml-4">Detalhamento Crítico (Descrição)</label>
+                <textarea 
+                  value={editingTask.description} 
+                  onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                  placeholder="Insira os detalhes e notas estratégicas sobre este trabalho..."
+                  rows={4}
+                  className="w-full bg-black/60 border border-white/10 p-7 rounded-[32px] font-medium text-sm outline-none focus:border-amber-500 transition-all placeholder:text-slate-800 resize-none scrollbar-hide"
+                />
               </div>
 
               <div className="space-y-4">
