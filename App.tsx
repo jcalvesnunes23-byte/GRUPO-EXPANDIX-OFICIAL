@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Board, BoardViewType, Task, TaskGroup, TaskStatus, TaskPriority, User } from './types';
 import { Icons } from './components/Icons';
-import { geminiService } from './services/geminiService';
 import { supabaseService } from './services/supabaseService';
 
 const GoldGradientText = ({ children, className = "" }: { children?: React.ReactNode, className?: string }) => (
@@ -366,16 +365,6 @@ export default function App() {
     setShowProfileModal(false);
   };
 
-  const handleAIAssistant = async () => {
-    if (!activeBoard) return;
-    const activityList = activeBoard.groups.flatMap(g => g.tasks.map(t => `${t.title} em fase ${g.name} com status ${t.status}`));
-    if (activityList.length === 0) return alert("Sem dados suficientes para análise neural.");
-    
-    alert("Iniciando Análise Neural Expandix...");
-    const summary = await geminiService.summarizeActivity(activityList);
-    alert(summary);
-  };
-
   if (isLoading) return null;
 
   return (
@@ -678,19 +667,6 @@ export default function App() {
           </div>
         )}
       </main>
-
-      {/* AI ASSISTANT FAB */}
-      <div className="fixed bottom-12 right-12 z-[150] animate-neural-entry">
-        <button 
-          onClick={handleAIAssistant}
-          className="w-20 h-20 rounded-full gemini-glow-btn flex items-center justify-center group"
-          title="Assistente Neural Gemini"
-        >
-          <div className="scale-125 group-hover:gold-text-gradient transition-all text-amber-500/80">
-            <Icons.Bot />
-          </div>
-        </button>
-      </div>
 
       {/* MODAL CONFIGURAÇÃO DE PERFIL */}
       {showProfileModal && currentUser && (

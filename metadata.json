@@ -1,6 +1,6 @@
 {
-  "name": "Grupo Expandix - Plataforma Inteligente de Gestão",
-  "description": "Um Work OS completo para o Grupo Expandix, com automações no-code, múltiplas visualizações, análise em tempo real e integração profunda com IA Gemini.",
+  "name": "Grupo Expandix - Plataforma de Gestão Corporativa",
+  "description": "Um Work OS completo para o Grupo Expandix, com automações no-code, múltiplas visualizações e análise de performance em tempo real.",
   "requestFramePermissions": [
     "camera",
     "microphone"

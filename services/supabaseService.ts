@@ -2,8 +2,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { Board, Task, User, TaskStatus, TaskPriority, TaskGroup } from '../types';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://uzpbkzebwoafjviicynw.supabase.co';
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6cGJremVid29hZmp2aWljeW53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjAwMTIsImV4cCI6MjA4MzEzNjAxMn0.9z0i7yy89R0BL9OLa7p2GhM0svqHzv5SjdErqT38gws';
+// Credenciais atualizadas conforme solicitação do usuário
+const supabaseUrl = 'https://njmozedupegrmnxmjvlg.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbW96ZWR1cGVncm1ueG1qdmxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMTQ4ODgsImV4cCI6MjA4Njc5MDg4OH0.aGqxUwZ5Siy72-KPVneFP3w59MkbFDlPhvkhEeqIY9U';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -11,7 +12,7 @@ const STORAGE_KEY = 'expandix_persistence_v1';
 const USER_STORAGE_KEY = 'expandix_user_profile_v1';
 
 export const supabaseService = {
-  // Script SQL Completo para Restauração Total do Sistema
+  // Script SQL Completo para Restauração Total do Sistema na nova instância
   RLS_FIX_SQL: `
 -- SCRIPT DE RESTAURAÇÃO TOTAL EXPANDIX NEURAL --
 -- Cole este código no SQL EDITOR do Supabase e clique em RUN --
@@ -53,7 +54,7 @@ ALTER TABLE public.boards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.task_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 
--- 3. POLÍTICAS
+-- 3. POLÍTICAS DE ACESSO PÚBLICO (AJUSTÁVEL CONFORME NECESSIDADE)
 DROP POLICY IF EXISTS "Public access to boards" ON public.boards;
 CREATE POLICY "Public access to boards" ON public.boards FOR ALL USING (true) WITH CHECK (true);
 
@@ -78,8 +79,8 @@ CREATE POLICY "Public access to tasks" ON public.tasks FOR ALL USING (true) WITH
         .order('created_at', { ascending: true });
       
       if (error) {
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-            this.handleRLSError({ message: "As tabelas do banco de dados foram removidas. É necessário recriar a estrutura." }, "fetchBoards");
+        if (error.code === 'PGRST116' || error.message.includes('does not exist') || error.code === '42P01') {
+            this.handleRLSError({ message: "As tabelas não existem na nova instância. É necessário rodar o script de restauração no SQL Editor." }, "fetchBoards");
         }
         throw error;
       }
@@ -187,8 +188,8 @@ CREATE POLICY "Public access to tasks" ON public.tasks FOR ALL USING (true) WITH
 
   handleRLSError(error: any, context: string) {
     console.error(`Database Alert (${context}):`, error.message);
-    // Se for erro de política ou se a tabela não existir mais
-    if (error.message?.includes("row-level security") || error.message?.includes("does not exist") || error.message?.includes("recriar a estrutura")) {
+    // Dispara modal de erro se as tabelas não existirem na nova instância njmozedupegrmnxmjvlg
+    if (error.message?.includes("row-level security") || error.message?.includes("does not exist") || error.code === '42P01') {
       window.dispatchEvent(new CustomEvent('supabase-rls-error', { detail: { message: error.message } }));
     }
   },
