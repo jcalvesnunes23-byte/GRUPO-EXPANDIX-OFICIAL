@@ -1,8 +1,8 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Board, Task, User, TaskStatus, TaskPriority, TaskGroup } from '../types';
+import { Board, Task, User, TaskGroup } from '../types';
 
-// Credenciais atualizadas conforme solicitação do usuário
+// Credenciais integradas do projeto njmozedupegrmnxmjvlg
 const supabaseUrl = 'https://njmozedupegrmnxmjvlg.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbW96ZWR1cGVncm1ueG1qdmxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMTQ4ODgsImV4cCI6MjA4Njc5MDg4OH0.aGqxUwZ5Siy72-KPVneFP3w59MkbFDlPhvkhEeqIY9U';
 
@@ -12,12 +12,12 @@ const STORAGE_KEY = 'expandix_persistence_v1';
 const USER_STORAGE_KEY = 'expandix_user_profile_v1';
 
 export const supabaseService = {
-  // Script SQL Completo para Restauração Total do Sistema na nova instância
+  // Script de inicialização do banco de dados para o usuário rodar no Supabase
   RLS_FIX_SQL: `
--- SCRIPT DE RESTAURAÇÃO TOTAL EXPANDIX NEURAL --
--- Cole este código no SQL EDITOR do Supabase e clique em RUN --
+-- EXPANDIX NEURAL DATABASE INITIALIZATION --
+-- Execute este script no SQL Editor do Supabase --
 
--- 1. TABELAS
+-- 1. Criação da Tabela de Hubs (Boards)
 CREATE TABLE IF NOT EXISTS public.boards (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS public.boards (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 2. Criação da Tabela de Grupos/Fases
 CREATE TABLE IF NOT EXISTS public.task_groups (
     id TEXT PRIMARY KEY,
     board_id TEXT REFERENCES public.boards(id) ON DELETE CASCADE,
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS public.task_groups (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 3. Criação da Tabela de Tarefas/Operações
 CREATE TABLE IF NOT EXISTS public.tasks (
     id TEXT PRIMARY KEY,
     group_id TEXT REFERENCES public.task_groups(id) ON DELETE CASCADE,
@@ -49,20 +51,15 @@ CREATE TABLE IF NOT EXISTS public.tasks (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. SEGURANÇA (RLS)
+-- 4. Habilitar Segurança (RLS)
 ALTER TABLE public.boards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.task_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 
--- 3. POLÍTICAS DE ACESSO PÚBLICO (AJUSTÁVEL CONFORME NECESSIDADE)
-DROP POLICY IF EXISTS "Public access to boards" ON public.boards;
-CREATE POLICY "Public access to boards" ON public.boards FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public access to task_groups" ON public.task_groups;
-CREATE POLICY "Public access to task_groups" ON public.task_groups FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public access to tasks" ON public.tasks;
-CREATE POLICY "Public access to tasks" ON public.tasks FOR ALL USING (true) WITH CHECK (true);
+-- 5. Políticas de Acesso Público para agilizar a operação (ajustar conforme necessidade de segurança)
+CREATE POLICY "Acesso Total Boards" ON public.boards FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Acesso Total Groups" ON public.task_groups FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Acesso Total Tasks" ON public.tasks FOR ALL USING (true) WITH CHECK (true);
   `,
 
   async fetchBoards(): Promise<Board[]> {
@@ -79,8 +76,9 @@ CREATE POLICY "Public access to tasks" ON public.tasks FOR ALL USING (true) WITH
         .order('created_at', { ascending: true });
       
       if (error) {
-        if (error.code === 'PGRST116' || error.message.includes('does not exist') || error.code === '42P01') {
-            this.handleRLSError({ message: "As tabelas não existem na nova instância. É necessário rodar o script de restauração no SQL Editor." }, "fetchBoards");
+        // Se a tabela não existir (42P01), notificamos a interface para oferecer a restauração
+        if (error.code === '42P01') {
+            this.handleRLSError(error, "Database Not Initialized");
         }
         throw error;
       }
@@ -101,7 +99,7 @@ CREATE POLICY "Public access to tasks" ON public.tasks FOR ALL USING (true) WITH
         return formatted;
       }
     } catch (e: any) {
-      console.warn("Utilizando cache local devido a falha no banco:", e.message);
+      console.warn("Utilizando redundância local (Cache) devido a erro de conexão:", e.message);
     }
     
     const localData = localStorage.getItem(STORAGE_KEY);
@@ -122,20 +120,8 @@ CREATE POLICY "Public access to tasks" ON public.tasks FOR ALL USING (true) WITH
   },
 
   async deleteBoard(boardId: string) {
-    try {
-      const { error } = await supabase
-        .from('boards')
-        .delete()
-        .eq('id', boardId);
-      
-      if (error) {
-        this.handleRLSError(error, "deleteBoard");
-        return false;
-      }
-      return true;
-    } catch (e) {
-      return false;
-    }
+    const { error } = await supabase.from('boards').delete().eq('id', boardId);
+    if (error) this.handleRLSError(error, "deleteBoard");
   },
 
   async saveGroup(groupId: string, boardId: string, groupData: Partial<TaskGroup>) {
@@ -152,10 +138,7 @@ CREATE POLICY "Public access to tasks" ON public.tasks FOR ALL USING (true) WITH
   },
 
   async deleteGroup(groupId: string) {
-    const { error } = await supabase
-      .from('task_groups')
-      .delete()
-      .eq('id', groupId);
+    const { error } = await supabase.from('task_groups').delete().eq('id', groupId);
     if (error) this.handleRLSError(error, "deleteGroup");
   },
 
@@ -179,18 +162,17 @@ CREATE POLICY "Public access to tasks" ON public.tasks FOR ALL USING (true) WITH
   },
 
   async deleteTask(taskId: string) {
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', taskId);
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId);
     if (error) this.handleRLSError(error, "deleteTask");
   },
 
   handleRLSError(error: any, context: string) {
-    console.error(`Database Alert (${context}):`, error.message);
-    // Dispara modal de erro se as tabelas não existirem na nova instância njmozedupegrmnxmjvlg
-    if (error.message?.includes("row-level security") || error.message?.includes("does not exist") || error.code === '42P01') {
-      window.dispatchEvent(new CustomEvent('supabase-rls-error', { detail: { message: error.message } }));
+    console.error(`Supabase Alert [${context}]:`, error.message);
+    // Dispara evento para o App.tsx exibir as instruções de recuperação
+    if (error.code === '42P01' || error.message?.includes("security policy") || error.status === 401) {
+      window.dispatchEvent(new CustomEvent('supabase-rls-error', { 
+        detail: { message: `Erro de sincronização na instância njmozedupegrmnxmjvlg: ${error.message}` } 
+      }));
     }
   },
 

@@ -195,6 +195,20 @@ export default function App() {
     await supabaseService.deleteGroup(groupId);
   };
 
+  const handleDeleteTask = async (taskId: string) => {
+    if (!window.confirm("Deseja remover esta operação do sistema?")) return;
+    const updated = boards.map(b => b.id === activeBoardId ? {
+      ...b,
+      groups: b.groups.map(g => ({
+        ...g,
+        tasks: g.tasks.filter(t => t.id !== taskId)
+      }))
+    } : b);
+    persist(updated);
+    setActiveMenuId(null);
+    await supabaseService.deleteTask(taskId);
+  };
+
   const handleAddTask = (groupId?: string, status?: TaskStatus) => {
     const targetGroupId = groupId || activeBoard?.groups[0]?.id || `g-${Date.now()}`;
     
@@ -554,6 +568,7 @@ export default function App() {
                                       <div className="absolute right-0 top-full mt-3 w-60 bg-[#0a0a0a] border border-white/10 rounded-3xl shadow-[0_30px_70px_rgba(0,0,0,0.9)] py-5 z-[80] animate-neural-entry" onClick={(e) => e.stopPropagation()}>
                                         <button onClick={(e) => { e.stopPropagation(); handleExportPdf(task); setActiveMenuId(null); }} className="w-full text-left px-8 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 transition-all">Exportar PDF</button>
                                         <button onClick={() => { setEditingTask(task); setIsNewTask(false); setActiveMenuId(null); }} className="w-full text-left px-8 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 transition-all">Editar Ficha</button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} className="w-full text-left px-8 py-4 text-[11px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-400 hover:bg-rose-500/5 transition-all">Excluir Trabalho</button>
                                       </div>
                                     )}
                                   </div>
@@ -603,7 +618,7 @@ export default function App() {
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, task.id)}
                                 onClick={() => { setEditingTask(task); setIsNewTask(false); }}
-                                className={`p-8 glass-card rounded-[40px] border-white/[0.04] cursor-grab active:cursor-grabbing group animate-neural-entry ${draggedTaskId === task.id ? 'opacity-30 scale-95 blur-md' : ''}`}
+                                className={`p-8 glass-card rounded-[40px] border-white/[0.04] cursor-grab active:cursor-grabbing group animate-neural-entry relative ${draggedTaskId === task.id ? 'opacity-30 scale-95 blur-md' : ''}`}
                                 style={{ animationDelay: `${(sIdx * 200) + (tIdx * 80)}ms` }}
                               >
                                 <div className="flex items-center gap-5 mb-6">
@@ -613,6 +628,19 @@ export default function App() {
                                   <div className="flex-1 min-w-0">
                                     <div className="text-[14px] font-black uppercase truncate tracking-tight group-hover:text-amber-400 transition-colors">{task.title}</div>
                                     <div className="text-[10px] text-slate-600 font-black uppercase tracking-widest truncate mt-1">{task.clientName}</div>
+                                  </div>
+                                  <div className="relative">
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === task.id ? null : task.id); }}
+                                      className="p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <Icons.More />
+                                    </button>
+                                    {activeMenuId === task.id && (
+                                      <div className="absolute right-0 top-full mt-2 w-48 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl py-3 z-[90] animate-neural-entry" onClick={(e) => e.stopPropagation()}>
+                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} className="w-full text-left px-6 py-3 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500/5 transition-all">Excluir Op</button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/[0.03]">
